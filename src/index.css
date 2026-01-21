@@ -1,0 +1,14 @@
+.card{
+  border:1px solid black;
+  border-radius:5px;
+  box-shadow:5px 5px 5px black;
+  text-align: center;
+  display:inline-block;
+  max-width:250px;
+}
+.card-image{
+  max-width:60%;
+  max-height:auto;
+  margin-bottom:10px;
+}
+
