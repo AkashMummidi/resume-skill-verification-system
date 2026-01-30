@@ -11,9 +11,9 @@ def extract_skills_from_text(text: str):
     entities = ner_pipeline(text)
     skills = set()
     for ent in entities:
+
         entity_type = ent.get("entity_group", "")
         word = ent.get("word", "").strip()
-
         if entity_type == "MISC" and len(word) > 1:
             skills.add(word)
 
