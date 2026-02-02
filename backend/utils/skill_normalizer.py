@@ -3,7 +3,11 @@ import re
 # 1. Stop words (noise)
 STOP_WORDS = {
     "cs", "skills", "skill", "education", "project",
-    "projects", "computer science", "profile"
+    "projects", "computer science", "profile", "computer science","programming",
+    "programming languages","web development","web technologies","web app",
+    "com","innovative","professional","persist","manage tasks","career development","time management","collaboration",
+    "collaborative","teamwork","communication","presentation","problem solve","problem solving","simulations",
+    
 }
 
 # 2. Alias mapping (normalization)
@@ -17,18 +21,10 @@ SKILL_ALIAS_MAP = {
     "html": "HTML",
     "css": "CSS",
     "reactjs": "React",
-    "nodejs": "Node.js",
-}
+    "nodejs": "Node.js"
 
-# 3. Short skills frequently missed by NER
-SHORT_SKILLS = {
-    "html": "HTML",
-    "css": "CSS",
-    "c": "C",
-    "c++": "C++"
 }
-
-def normalize_skills(raw_skills: list, resume_text: str):
+def normalize_skills(raw_skills: list):
     normalized = set()
 
     # ---- STEP A: Clean + normalize AI-extracted skills ----
@@ -42,12 +38,5 @@ def normalize_skills(raw_skills: list, resume_text: str):
             normalized.add(SKILL_ALIAS_MAP[skill_clean])
         else:
             normalized.add(skill.strip())
-
-    # ---- STEP B: Supplement missing short skills from resume text ----
-    resume_text_lower = resume_text.lower()
-
-    for short, proper in SHORT_SKILLS.items():
-        if re.search(rf"\b{re.escape(short)}\b", resume_text_lower):
-            normalized.add(proper)
 
     return sorted(normalized)
