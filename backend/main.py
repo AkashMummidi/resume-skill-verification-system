@@ -1,8 +1,10 @@
 from fastapi import FastAPI, UploadFile, File
 from utils.pdf_reader import extract_pdf_text
 from utils.skill_normalizer import normalize_skills
-from utils.entity_classifier import classify_entities
 from utils.resume_skill_extractor import extract_skills_from_resume
+from utils.confidence_engine import compute_skill_confidence
+from utils.project_analyzer import extract_project_skills
+from utils.certification_analyzer import extract_certified_skills
 
 app = FastAPI()
 
@@ -19,10 +21,24 @@ async def upload_resume(file: UploadFile = File(...)):
     
     raw_skills = extract_skills_from_resume(extracted_text)
 
-    normalized_skills=normalize_skills(raw_skills)
+    normalized_skills=set(normalize_skills(raw_skills)) #Skills of the resume
+
+    project_skills=extract_project_skills(extracted_text,normalized_skills)
+    certified_skills=extract_certified_skills(extracted_text,normalized_skills)
+
+    # 3. Compute confidence per skill
+    confidence_map = {}
+
+    for skill in normalized_skills:
+        confidence_map[skill] = compute_skill_confidence(
+        skill,
+        raw_skills,
+        project_skills,
+        certified_skills
+    )
 
 
     return {
         "filename": file.filename,
-        "text_preview":normalized_skills
+        "Confidence_rating":confidence_map
     }
