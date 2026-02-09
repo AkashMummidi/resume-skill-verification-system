@@ -2,7 +2,7 @@ import re
 
 # 1. Stop words (noise)
 STOP_WORDS = {
-    "cs", "skills", "skill", "education", "project",
+    "skills", "skill", "education", "project",
     "projects", "computer science", "profile", "computer science","programming",
     "programming languages","web development","web technologies","web app",
     "com","innovative","professional","persist","manage tasks","career development","time management","collaboration",

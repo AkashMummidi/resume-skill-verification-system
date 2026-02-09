@@ -11,7 +11,6 @@ def compute_skill_confidence(
         if skill in resume_skills:
             score += WEIGHTS["resume"]
 
-        # Project usage
         if skill in project_skills:
             score += WEIGHTS["project"]
 
@@ -19,4 +18,4 @@ def compute_skill_confidence(
         if skill in certified_skills:
             score += WEIGHTS["certification"]
 
-        return min(score, MAX_CONFIDENCE)
+        return min(score,MAX_CONFIDENCE)
