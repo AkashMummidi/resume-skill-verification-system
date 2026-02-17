@@ -4,7 +4,8 @@ def compute_skill_confidence(
     skill: str,
     resume_skills: set,
     project_skills: set,
-    certified_skills: set) -> int:
+    certified_skills: set,
+    github_skills:set) -> int:
         score = 0
 
         # Resume presence
@@ -17,5 +18,8 @@ def compute_skill_confidence(
         # Certification support
         if skill in certified_skills:
             score += WEIGHTS["certification"]
+
+        if skill in github_skills:
+            score+=WEIGHTS["Github"]
 
         return min(score,MAX_CONFIDENCE)

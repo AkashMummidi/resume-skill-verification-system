@@ -21,6 +21,4 @@ def extract_project_skills(resume_text: str, resume_skills: set[str]) -> set[str
     # 3. Keep only skills already present in resume skill set
     for skill in normalized_project_skills:
         if skill in resume_skills:project_skills.add(skill)
-    
-    print(project_skills)
     return project_skills
