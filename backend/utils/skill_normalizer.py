@@ -12,16 +12,11 @@ STOP_WORDS = {
 
 # 2. Alias mapping (normalization)
 SKILL_ALIAS_MAP = {
-    "js": "JavaScript",
-    "javascript": "JavaScript",
-    "py": "Python",
-    "python": "Python",
-    "sql": "SQL",
-    "git": "Git",
-    "html": "HTML",
-    "css": "CSS",
-    "reactjs": "React",
-    "nodejs": "Node.js"
+    "js": "javascript",
+    "javascript": "javascript",
+    "py": "python",
+    "reactjs": "react",
+    "nodejs": "node.js"
 
 }
 def normalize_skills(raw_skills: list):

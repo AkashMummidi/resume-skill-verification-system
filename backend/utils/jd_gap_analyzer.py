@@ -10,8 +10,6 @@ def analyze_jd_skill_gap(
             report[skill] = {
                 "status": "Missing",
                 "confidence": 0,
-                "reason": "Required by JD but not present in resume",
-                "suggested_action": f"Learn {skill} fundamentals and syntax"
             }
         else:
             confidence = confidence_map.get(skill, 0)
@@ -20,22 +18,16 @@ def analyze_jd_skill_gap(
                 report[skill] = {
                     "status": "Weak Evidence",
                     "confidence": confidence,
-                    "reason": "Mentioned but lacks supporting evidence",
-                    "suggested_action": f"Build a project demonstrating {skill}"
                 }
             elif confidence < 70:
                 report[skill] = {
                     "status": "Moderate Evidence",
                     "confidence": confidence,
-                    "reason": "Some evidence found, depth unclear",
-                    "suggested_action": f"Improve depth and real-world usage of {skill}"
                 }
             else:
                 report[skill] = {
                     "status": "Strong Evidence",
                     "confidence": confidence,
-                    "reason": "Skill well supported by evidence",
-                    "suggested_action": f"Explore advanced use-cases of {skill}"
                 }
 
     return report

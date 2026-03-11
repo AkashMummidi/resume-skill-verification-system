@@ -1,12 +1,19 @@
 ACTION_TEMPLATES = {
-    "backend": {
+    "backend_language": {
         "missing": "Learn {skill} fundamentals and write basic programs",
         "low": "Build a REST API using {skill} with database integration",
         "medium": "Improve architecture, error handling, and scalability in {skill}",
         "high": "Explore production-grade backend patterns using {skill}",
     },
 
-    "frontend": {
+    "frontend_framework": {
+        "missing": "Learn core concepts of {skill} and build static UI components",
+        "low": "Build a dynamic UI using {skill} with state management",
+        "medium": "Improve UI performance and component architecture in {skill}",
+        "high": "Build complex, accessible, production-grade interfaces",
+    },
+
+    "frontend_logic": {
         "missing": "Learn core concepts of {skill} and build static UI components",
         "low": "Build a dynamic UI using {skill} with state management",
         "medium": "Improve UI performance and component architecture in {skill}",

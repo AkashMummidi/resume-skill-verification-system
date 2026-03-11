@@ -1,15 +1,15 @@
 SKILL_CATEGORY_MAP = {
     # Backend
-    "python": "backend",
-    "java": "backend",
-    "node": "backend",
-    "fastapi": "backend",
+    "python": "backend_language",
+    "java": "backend_language",
+    "node": "backend_language",
+    "fastapi": "backend_language",
 
     # Frontend
-    "html": "frontend",
-    "css": "frontend",
-    "javascript": "frontend",
-    "react": "frontend",
+    "html": "frontend_logic",
+    "css": "frontend_logic",
+    "javascript": "frontend_logic",
+    "react": "frontend_framework",
 
     # Database
     "sql": "database",

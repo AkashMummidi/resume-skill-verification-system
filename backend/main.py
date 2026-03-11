@@ -10,6 +10,10 @@ from utils.github_skills_extractor import extract_github_skills,REPO_BASE_PATH
 from utils.jd_skill_extractor import extract_skills_from_jd
 from utils.jd_gap_analyzer import analyze_jd_skill_gap
 from utils.suggestion_engine import generate_skill_suggestion
+from utils.skill_policy import apply_skill_policy
+from utils.cf_analyzer import fetch_cf_rating
+from utils.cf_confidence_mapping import compute_cf_score
+from utils.preparation_planner import generate_preparation_plan
 import os
 
 app = FastAPI()
@@ -37,18 +41,31 @@ async def upload_resume(file: UploadFile = File(...)):
 
     github_skills = extract_github_skills(repo_path) # skills backed by github
 
+    # TEMP: mock CF data (replace with API later)
+    cf_rating = 1350
+    cf_problems = 280
+    cf_contests = 14
+
+    cf_score = compute_cf_score(
+        cf_rating,
+        cf_problems,
+        cf_contests
+    )
+
 
     # 3. Compute confidence per skill
-    confidence_map = {}
+    raw_confidence_map = {}
 
     for skill in normalized_skills:
-        confidence_map[skill] = compute_skill_confidence(
+        raw_confidence_map[skill] = compute_skill_confidence(
         skill,
         normalized_skills,
         project_skills,
         certified_skills,
-        github_skills
+        github_skills,
+        cf_score
     )
+    confidence_map=apply_skill_policy(raw_confidence_map)
 
     skill_gap_report = {}
 
@@ -99,29 +116,38 @@ async def analyze_jd(
     repo_path = os.path.join(REPO_BASE_PATH, "candidate_repo")
     github_skills = extract_github_skills(repo_path)
 
-    confidence_map = {}
+    # TEMP — later user input
+    cf_handle = "Akash9908" 
+    cf_rating = fetch_cf_rating(cf_handle)
+
+    cf_score = compute_cf_score(cf_rating)
+
+    raw_confidence_map = {}
     for skill in resume_skills:
-        confidence_map[skill] = compute_skill_confidence(
+        raw_confidence_map[skill] = compute_skill_confidence(
             skill,
             resume_skills,
             project_skills,
             certified_skills,
-            github_skills
+            github_skills,
+            cf_score
         )
 
+    confidence_map=apply_skill_policy(raw_confidence_map)
     # --- JD pipeline ---
     jd_raw_skills = extract_skills_from_jd(jd_text)
     jd_skills = set(normalize_skills(jd_raw_skills))
+
 
     # --- Skill gap analysis ---
     jd_gap_report = {}
 
     for jd_skill in jd_skills:
         if jd_skill in resume_skills:
-            confidence = confidence_map.get(jd_skill, 0)
+            confidence = confidence_map.get(jd_skill,0)
         else:
-            confidence = 0  # truly missing skill
-
+            confidence = 0 
+        
         suggestion = generate_skill_suggestion(jd_skill, confidence)
 
         jd_gap_report[jd_skill] = {
@@ -134,11 +160,15 @@ async def analyze_jd(
             ),
             "suggested_action": suggestion
         }
+    plan = generate_preparation_plan(
+    jd_gap_report,
+    days_until_interview=15,
+    hours_per_day=2)
 
 
     return {
-        "jd_skills": sorted(jd_skills),
-        "resume_skills": sorted(resume_skills),
-        "skill_gap_report": jd_gap_report
+        "jd_skills":jd_skills,
+        "skill_gap_report": jd_gap_report,
+        "skills":resume_skills,
+        "plan":plan
     }
-
