@@ -1,9 +1,11 @@
 import pdfplumber
+import io
 
-def extract_pdf_text(file):
+def extract_pdf_text_from_bytes(file_bytes: bytes):
     text = ""
-    with pdfplumber.open(file.file) as pdf:
+
+    with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
         for page in pdf.pages:
             text += page.extract_text() or ""
-    return text
 
+    return text

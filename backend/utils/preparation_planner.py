@@ -1,6 +1,6 @@
 from utils.skill_categories import SKILL_CATEGORY_MAP
 from utils.category_roadmaps import CATEGORY_ROADMAPS
-
+from utils.task_blueprint import TASK_BLUEPRINTS, TASK_BLOCK_MAP
 
 STATUS_PRIORITY = {
     "Missing": 4,
@@ -10,111 +10,168 @@ STATUS_PRIORITY = {
 }
 
 
-SKILL_DIFFICULTY = {
-    "python": 3,
-    "java": 3,
-    "c": 3,
+# -------------------------
+# GET TOPICS BASED ON CONFIDENCE
+# -------------------------
+def get_topics_by_confidence(category, confidence):
 
-    "react": 3,
-    "javascript": 2,
-
-    "sql": 2,
-
-    "html": 1,
-    "css": 1,
-
-    "data structures": 4,
-    "algorithms": 4
-}
-LEVEL_ORDER = ["basic", "intermediate", "advanced"]
-
-def generate_syllabus(skill, status, allocated_hours):
-
-    skill_l = skill.lower()
-
-    category = SKILL_CATEGORY_MAP.get(skill_l)
-
-    if not category:
-        return ["Study core concepts and build a small project"]
-
-    roadmap = CATEGORY_ROADMAPS[category]
-
-    # Starting level based on skill status
-    if status == "Missing":
-        start_level = "basic"
-
-    elif status == "Weak Evidence":
-        start_level = "basic"
-
-    elif status == "Moderate Evidence":
-        start_level = "intermediate"
-
-    else:
-        start_level = "advanced"
-
-    # Max level based on available time
-    if allocated_hours < 5:
-        max_level = "basic"
-
-    elif allocated_hours < 12:
-        max_level = "intermediate"
-
-    else:
-        max_level = "advanced"
-
-    # Convert to indices
-    start_index = LEVEL_ORDER.index(start_level)
-    max_index = LEVEL_ORDER.index(max_level)
-
-    if max_index < start_index:
-        max_index = start_index
+    roadmap = CATEGORY_ROADMAPS.get(category, CATEGORY_ROADMAPS["default"])
 
     topics = []
 
-    for level in LEVEL_ORDER[start_index:max_index + 1]:
-        topics.extend(roadmap[level])
+    if confidence < 30:
+        topics.extend(roadmap["basic"])
+        topics.extend(roadmap["intermediate"])
 
-    syllabus = [t.format(skill=skill) for t in topics]
+    elif confidence < 70:
+        topics.extend(roadmap["intermediate"])
+    else:
+        topics.extend(roadmap["advanced"])
 
-    return syllabus
+    if confidence < 70:
+        topics.extend(roadmap["advanced"])
+
+    return topics
 
 
-def generate_preparation_plan(
-    skill_gap_report: dict,
-    days_until_interview: int,
-    hours_per_day: int
-):
+# -------------------------
+# TOPIC PIPELINE
+# -------------------------
+def generate_topic_pipeline(skill, topic_data, confidence):
 
-    total_hours = days_until_interview * hours_per_day
+    topic = topic_data["topic"]
+    task_type = topic_data.get("type", "practice")
 
-    skill_weights = {}
-    total_weight = 0
+    blueprint = TASK_BLUEPRINTS.get(topic, {})
+    pipeline = []
 
-    for skill, data in skill_gap_report.items():
+    # -------------------------
+    # LOW CONFIDENCE (<40)
+    # -------------------------
+    if confidence < 40:
 
-        status = data["status"]
+        if "learn" in blueprint:
+            for item in blueprint["learn"]:
+                pipeline.append({
+                    "task": item["task"],
+                    "blocks": TASK_BLOCK_MAP[item["level"]]
+                })
 
-        priority = STATUS_PRIORITY.get(status, 1)
-        difficulty = SKILL_DIFFICULTY.get(skill.lower(), 2)
+        if "practice" in blueprint:
+            for item in blueprint["practice"]:
+                pipeline.append({
+                    "task": item["task"],
+                    "blocks": TASK_BLOCK_MAP[item["level"]]
+                })
 
-        weight = priority * difficulty
+        if "build" in blueprint:
+            for item in blueprint["build"]:
+                pipeline.append({
+                    "task": item["task"],
+                    "blocks": TASK_BLOCK_MAP[item["level"]]
+                })
 
-        skill_weights[skill] = weight
-        total_weight += weight
+    # -------------------------
+    # MEDIUM CONFIDENCE
+    # -------------------------
+    elif confidence < 70:
 
-    preparation_plan = {}
+        if "practice" in blueprint:
+            for item in blueprint["practice"]:
+                pipeline.append({
+                    "task": item["task"],
+                    "blocks": TASK_BLOCK_MAP[item["level"]]
+                })
 
-    for skill, weight in skill_weights.items():
+        if "build" in blueprint:
+            for item in blueprint["build"]:
+                pipeline.append({
+                    "task": item["task"],
+                    "blocks": TASK_BLOCK_MAP[item["level"]]
+                })
 
-        allocated_hours = (weight / total_weight) * total_hours
+    # -------------------------
+    # HIGH CONFIDENCE
+    # -------------------------
+    else:
 
-        status = skill_gap_report[skill]["status"]
+        if "practice" in blueprint:
+            for item in blueprint["practice"]:
+                if item["level"] != "small":
+                    pipeline.append({
+                        "task": item["task"],
+                        "blocks": TASK_BLOCK_MAP[item["level"]]
+                    })
 
-        syllabus = generate_syllabus(skill,status, allocated_hours)
+    # -------------------------
+    # SMART FALLBACK
+    # -------------------------
+    if not pipeline:
 
-        preparation_plan[skill] = {
-            "allocated_hours": round(allocated_hours, 1),
-            "syllabus": syllabus
-        }
+        if topic in ["syntax", "control_flow", "functions"]:
+            pipeline.append({
+                "task": f"Learn and practice {topic} in {skill}",
+                "blocks": 1
+            })
 
-    return preparation_plan
+        elif topic in ["oop", "file_handling"]:
+            pipeline.append({
+                "task": f"Practice {topic} with small programs in {skill}",
+                "blocks": 2
+            })
+
+        else:
+            pipeline.append({
+                "task": f"Practice {topic} with real problems in {skill}",
+                "blocks": 2
+            })
+
+    return pipeline
+
+
+# -------------------------
+# MAIN PLAN
+# -------------------------
+def generate_preparation_plan(skill_gap_report, total_days, hours_per_day):
+
+    total_slots = total_days * hours_per_day
+    tasks = []
+
+    sorted_skills = sorted(
+        skill_gap_report.items(),
+        key=lambda x: (
+            STATUS_PRIORITY.get(x[1]["status"], 1),
+            -x[1]["confidence"]
+        ),
+        reverse=True
+    )
+
+    current_slots = 0
+
+    for skill, data in sorted_skills:
+
+        confidence = data["confidence"]
+        category = SKILL_CATEGORY_MAP.get(skill.lower(), "default")
+
+        topics = get_topics_by_confidence(category, confidence)
+
+        for topic_data in topics:
+
+            pipeline = generate_topic_pipeline(skill, topic_data, confidence)
+
+            for task_data in pipeline:
+
+                if current_slots >= total_slots:
+                    return tasks
+
+                tasks.append({
+                    "task": task_data["task"],
+                    "skill": skill,
+                    "priority": 1,
+                    "blocks": task_data["blocks"],
+                    "completed": False
+                })
+
+                current_slots += 1
+
+    return tasks

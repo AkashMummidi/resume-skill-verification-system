@@ -11,27 +11,26 @@ def compute_skill_confidence(
     resume_skills: set,
     project_skills: set,
     certified_skills: set,
-    github_skills:set,
-    cf_score:int) -> int:
-        score = 0
+    github_scores: dict,
+    cf_score: int
+) -> int:
 
-        # Resume presence
-        if skill in resume_skills:
-            score += WEIGHTS["resume"]
+    score = 0
 
-        if skill in project_skills:
-            score += WEIGHTS["project"]
+    if skill in resume_skills:
+        score += WEIGHTS["resume"]
 
-        # Certification support
-        if skill in certified_skills:
-            score += WEIGHTS["certification"]
+    if skill in project_skills:
+        score += WEIGHTS["project"]
 
-        # Github support
-        if skill in github_skills:
-            score+=WEIGHTS["Github"]
-        
-        # CF applies ONLY to CS fundamentals
-        if skill.lower() in CS_FUNDAMENTALS:
-            score += cf_score
+    if skill in certified_skills:
+        score += WEIGHTS["certification"]
 
-        return min(score,MAX_CONFIDENCE)
+    # GitHub evidence
+    github_score = github_scores.get(skill, 0)
+    score += github_score * WEIGHTS["Github"]
+
+    if skill.lower() in CS_FUNDAMENTALS:
+        score += cf_score
+
+    return min(score, MAX_CONFIDENCE)

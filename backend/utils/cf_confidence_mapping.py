@@ -1,33 +1,17 @@
-def compute_cf_score(
-    rating: int
-) -> int:
-    """
-    Compute Codeforces-based evidence score.
-    Applies ONLY to CS fundamentals (DSA / Algorithms).
-    """
+def compute_cf_score(cf_data):
 
-    score = 0
+    rating = cf_data["rating"]
+    solved = cf_data["problems_solved"]
+    contests = cf_data["contests"]
 
-    # ---- Rating-based evidence ----
-    if rating >= 1400:
-        score += 35
-    elif rating >= 1200:
-        score += 25
-    elif rating >= 1000:
-        score += 20
-    elif rating >= 700:
-        score += 15
-    elif rating >= 500:
-        score += 10
+    # -------------------------
+    # Normalize each factor
+    # -------------------------
 
-    # ---- Volume-based evidence (supporting, not dominant) ----
-    '''if problems_solved >= 200:
-        score += 10
-    elif problems_solved >= 100:
-        score += 5
+    rating_score = min(rating / 2000, 1) * 50     # max 50
+    solved_score = min(solved / 300, 1) * 30      # max 30
+    contest_score = min(contests / 50, 1) * 20    # max 20
 
-    if contests >= 5:
-        score += 5'''
+    total_score = rating_score + solved_score + contest_score
 
-    # CF should NEVER overpower other evidence
-    return min(score, 40)
+    return round(total_score)
