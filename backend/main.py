@@ -1,8 +1,10 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Form
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form,Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from datetime import datetime
 import copy
+import json
+import math
 
 # --- Utils ---
 from utils.pdf_reader import extract_pdf_text_from_bytes
@@ -21,6 +23,8 @@ from utils.cf_confidence_mapping import compute_cf_score
 from utils.preparation_planner import generate_preparation_plan
 from utils.daily_scheduler import generate_daily_schedule
 from utils.reschedule_planner import reschedule_plan
+from utils.test_engine import get_distribution,compute_counts,generate_questions,validate,fallback
+
 
 # --- DB ---
 from utils.db import users_collection, plans_collection
@@ -32,7 +36,7 @@ app = FastAPI()
 # --- CORS ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -104,6 +108,7 @@ def login(user: User):
 
 @app.post("/analyze-jd")
 async def analyze_jd(
+    request: Request,
     resume_file: UploadFile = File(...),
     jd_file: UploadFile = File(...),
     username: str = Form(...),
@@ -111,13 +116,15 @@ async def analyze_jd(
     days_until_interview: int = Form(...),
     hours_per_day: int = Form(...),
 
-    # 🔥 NEW
     github_username: str = Form(None),
     github_opt_out: bool = Form(False),
 
     cf_username: str = Form(None),
-    cf_opt_out: bool = Form(False)
+    cf_opt_out: bool = Form(False),
+    test_scores: str = Form(None)
 ):
+    form = await request.form()
+    verify_only = form.get("verify_only")
 
     if not resume_file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Resume must be PDF")
@@ -140,9 +147,26 @@ async def analyze_jd(
     # -------------------------
     # Extract profiles (GitHub + CF)
     # -------------------------
+
+    parsed_test_scores = {}
+
+    if test_scores:
+        try:
+            parsed_test_scores = json.loads(test_scores)
+        except:
+            parsed_test_scores = {}
+
+    print("TEST SCORES RECEIVED:", parsed_test_scores)
+
+    normalized_test_scores = {}
+
+    for skill, score in parsed_test_scores.items():
+        normalized_skill = skill.strip().lower()
+        normalized_test_scores[normalized_skill] = score
+
+    print("NORMALIZED TEST SCORES:", normalized_test_scores)
     extracted_github, extracted_cf = extract_profiles(resume_bytes, resume_text)
 
-    # 🔥 Fallback logic
     github_username = github_username or extracted_github
     cf_username = cf_username or extracted_cf
 
@@ -184,11 +208,16 @@ async def analyze_jd(
         cf_score = 0
 
     # -------------------------
-    # Confidence
+    # JD skills
     # -------------------------
+    jd_raw_skills = extract_skills_from_jd(jd_text)
+    jd_skills = set(normalize_skills(jd_raw_skills))
+
+    print(jd_skills)
+
     raw_confidence_map = {}
 
-    for skill in resume_skills:
+    for skill in jd_skills:
         raw_confidence_map[skill] = compute_skill_confidence(
             skill,
             resume_skills,
@@ -197,15 +226,21 @@ async def analyze_jd(
             github_skills,
             cf_score
         )
-
-    confidence_map = apply_skill_policy(raw_confidence_map)
-
+    print(raw_confidence_map)
     # -------------------------
-    # JD skills
+    # FINAL CONFIDENCE (WITH TEST)
     # -------------------------
-    jd_raw_skills = extract_skills_from_jd(jd_text)
-    jd_skills = set(normalize_skills(jd_raw_skills))
+    confidence_map = {}
 
+    for skill, base_conf in raw_confidence_map.items():
+
+        test_score = normalized_test_scores.get(skill.lower(), 0)
+
+        final_conf = 0.9 * base_conf + 0.1 * test_score
+
+        confidence_map[skill] = math.ceil(final_conf)
+
+    confidence_map = apply_skill_policy(confidence_map)
     # -------------------------
     # Gap analysis
     # -------------------------
@@ -226,7 +261,11 @@ async def analyze_jd(
             ),
             "suggested_action": suggestion
         }
-
+    if verify_only:
+        return {
+            "github": github_username,
+            "codeforces": cf_username
+        }
     # -------------------------
     # PLAN GENERATION
     # -------------------------
@@ -311,17 +350,17 @@ def reschedule_api(data: RescheduleRequest):
     if data.missed_day in existing_days:
         raise HTTPException(status_code=400, detail="Day already rescheduled")
 
-    # 🔥 ALWAYS start from ORIGINAL schedule
+    # ALWAYS start from ORIGINAL schedule
     base_schedule = copy.deepcopy(
         plan.get("original_schedule", plan["schedule"])
     )
 
-    # 🔥 Add new day and sort
+    #  Add new day and sort
     all_rescheduled_days = sorted(existing_days + [data.missed_day])
 
     new_schedule = base_schedule
 
-    # 🔥 APPLY reschedules one by one (clean replay)
+    #  APPLY reschedules one by one (clean replay)
     for day in all_rescheduled_days:
         new_schedule = reschedule_plan(
             schedule=new_schedule,
@@ -456,10 +495,67 @@ def delete_resume(data: dict):
         {"username": username},
         {"$unset": {"resume_text": ""}}
     )
+    plans_collection.delete_one({"username": username})
 
     return {"message": "Resume deleted"}
 
 @app.delete("/delete-plan/{username}")
 def delete_plan(username: str):
-    plans_collection.delete_one({"username": username})
+    plans_collection.delete_many({"username": username})
     return {"message": "Plan deleted"}
+
+@app.post("/generate-test")
+def generate_test(data: dict):
+    try:
+        skills = data.get("skills", [])
+
+        if not skills or not isinstance(skills, list):
+            raise HTTPException(status_code=400, detail="Skills list required")
+
+        result = generate_questions(skills, total_per_skill=10)
+
+        print("RAW RESULT:", result)
+
+        clean_result = {}
+
+        for skill in skills:
+            qs = result.get(skill, [])
+
+            valid_qs = validate(qs)
+
+            # fallback if empty
+            if not valid_qs:
+                valid_qs = fallback(skill, "mixed", 5)
+
+            clean_result[skill] = valid_qs
+
+        return {
+            "questions": clean_result
+        }
+
+    except Exception as e:
+        print("ENDPOINT CRASH:", e)
+        return {
+            "questions": {}
+        }
+
+def get_distribution(conf):
+    if conf < 30:
+        return {"easy": 0.7, "medium": 0.3, "hard": 0.0}
+    elif conf < 70:
+        return {"easy": 0.3, "medium": 0.5, "hard": 0.2}
+    else:
+        return {"easy": 0.0, "medium": 0.3, "hard": 0.7}
+
+
+def compute_counts(dist, total=10):
+    counts = {k: int(v * total) for k, v in dist.items()}
+    remaining = total - sum(counts.values())
+
+    for k in ["hard", "medium", "easy"]:
+        if remaining <= 0:
+            break
+        counts[k] += 1
+        remaining -= 1
+
+    return counts

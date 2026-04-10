@@ -1,5 +1,7 @@
 import copy
 
+import copy
+
 def reschedule_plan(
     schedule,
     skill_gap_report,
@@ -11,7 +13,7 @@ def reschedule_plan(
     # Convert keys → int
     original = {int(k): v for k, v in schedule.items()}
 
-    # 🔥 Deep copy to avoid mutation bugs
+    #  Deep copy to avoid mutation bugs
     original = copy.deepcopy(original)
 
     new_schedule = {}

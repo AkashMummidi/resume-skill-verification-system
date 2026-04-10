@@ -1,9 +1,18 @@
+# =========================
+# CONFIDENCE WEIGHTS
+# =========================
+
+# Base contributions (fixed signals)
 WEIGHTS = {
-    "resume": 20,        # skill mentioned anywhere
-    "project": 25,       # skill used in project
-    "certification": 10, # skill backed by cert (capped)
-    "Github":0.375,     # skill backed by github
-    "codeforces":10         
+    "resume": 20,
+    "project": 25,
+    "certification": 10,
 }
 
+# Max cap
 MAX_CONFIDENCE = 100
+
+# Scaling factors
+GITHUB_MAX_CONTRIBUTION = 25   # GitHub max impact
+CF_MAX_CONTRIBUTION = 20       # Codeforces max impact
+CF_MAX_RATING = 2000           # normalization cap

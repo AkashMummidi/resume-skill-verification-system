@@ -16,4 +16,8 @@ def compute_dependency_level(skill, visited=None):
     if not deps:
         return 0
 
-    return 1 + max(compute_dependency_level(dep, visited) for dep in deps)
+    # FIX: use copy to avoid cross-branch interference
+    return 1 + max(
+        compute_dependency_level(dep, visited.copy())
+        for dep in deps
+    )

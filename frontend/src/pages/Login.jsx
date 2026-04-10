@@ -23,7 +23,7 @@ export default function Login({ setPage }) {
 
       if (res.ok) {
       localStorage.setItem("username", username);
-      localStorage.setItem("page", "dashboard"); // 🔥 THIS LINE FIXES EVERYTHING
+      localStorage.setItem("page", "dashboard");
       setPage("dashboard");
     } else {
         alert(data.detail);

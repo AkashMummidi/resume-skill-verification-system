@@ -11,8 +11,6 @@ export default function Dashboard() {
 
   const [loading, setLoading] = useState(false);
 
-  const [profileStep, setProfileStep] = useState(false);
-
   const [detectedGithub, setDetectedGithub] = useState(null);
   const [detectedCF, setDetectedCF] = useState(null);
 
@@ -24,13 +22,28 @@ export default function Dashboard() {
 
   const [tasks, setTasks] = useState(null);
 
-  // 🔥 RESCHEDULE STATE
+  //  RESCHEDULE STATE
   const [rescheduledDays, setRescheduledDays] = useState([]);
 
-  // ✅ GET USERNAME
-const username = localStorage.getItem("username");
+  //  GET USERNAME
+  const username = localStorage.getItem("username");
 
-// 🔥 AUTH CHECK (RUN ONLY ONCE)
+  const [jdSkills, setJdSkills] = useState([]);
+  const [confidenceMap, setConfidenceMap] = useState({});
+ 
+  const [currentSkill, setCurrentSkill] = useState(null);
+  const [allQuestions, setAllQuestions] = useState({});
+  const [answers, setAnswers] = useState({});
+  const [completedSkills, setCompletedSkills] = useState([]);
+
+  const [testScores, setTestScores] = useState({});
+  const [step, setStep] = useState("upload");
+
+  const [totalDays, setTotalDays] = useState(0);
+  const [visibleDays, setVisibleDays] = useState(0);
+
+
+//  AUTH CHECK (RUN ONLY ONCE)
 useEffect(() => {
   const storedUser = localStorage.getItem("username");
 
@@ -39,7 +52,6 @@ useEffect(() => {
   }
 }, []);
 
-// 🔥 LOAD PLAN ON REFRESH
 useEffect(() => {
   const storedUser = localStorage.getItem("username");
   if (!storedUser) return;
@@ -52,12 +64,23 @@ useEffect(() => {
 
       const data = await res.json();
 
-      if (data?.daily_tasks) {
+     if (data?.daily_tasks && Object.keys(data.daily_tasks).length > 0) {
         setTasks(data.daily_tasks);
         setRescheduledDays(data.rescheduled_days || []);
-        setProfileStep(true);
+        setStep("plan");
+
+        const nonEmptyDays = Object.entries(data.daily_tasks)
+  .filter(([_, tasks]) => tasks.length > 0)
+  .map(([day]) => Number(day));
+
+const actualDays = nonEmptyDays.length > 0 ? Math.max(...nonEmptyDays) : 0;
+
+setVisibleDays(actualDays);
+setTotalDays(data.total_days || actualDays);
+      } else {
+        setStep("upload"); // fallback
       }
-    } catch (err) {
+        } catch (err) {
       console.error(err);
     }
   };
@@ -102,7 +125,7 @@ useEffect(() => {
       setDetectedGithub(data.github || null);
       setDetectedCF(data.codeforces || null);
 
-      setProfileStep(true);
+      setStep("verify");
 
     } catch (err) {
       console.error(err);
@@ -141,14 +164,24 @@ useEffect(() => {
 
       const data = await res.json();
 
-      setTasks(data.daily_tasks);
+      const skills = Object.keys(data.jd_gap_report || {});
+      const confidence = data.confidence_map || {};
 
+      if (!skills || skills.length === 0) {
+        alert("No JD skills extracted — backend failed");
+        return null;
+      }
+
+      setJdSkills(skills);
+      setConfidenceMap(confidence);
+
+
+      return skills;
     } catch (err) {
       console.error(err);
       alert("Error generating plan");
     }
 
-    setLoading(false);
   };
 
   // ---------------------------
@@ -180,6 +213,10 @@ useEffect(() => {
 
       setTasks(data.daily_tasks);
 
+      if (visibleDays < totalDays) {
+  setVisibleDays(prev => prev + 1);
+}
+
     } catch (err) {
       console.error(err);
       alert("Reschedule failed");
@@ -210,14 +247,105 @@ useEffect(() => {
         })
       });
     };
+  
 
+const submitTest = () => {
+  const questions = allQuestions[currentSkill];
+
+  let score = 0;
+
+  questions.forEach((q, i) => {
+    if (answers[i] === q.answer) score++;
+  });
+
+  const percentage = (score / questions.length) * 100;
+
+  alert(`${currentSkill} Score: ${percentage}`);
+
+  //  STORE SCORE
+  setTestScores(prev => ({
+    ...prev,
+    [currentSkill]: percentage
+  }));
+
+  // mark completed
+  setCompletedSkills([...completedSkills, currentSkill]);
+
+  setStep("skills");
+};
+
+const generatePlan = async () => {
+
+  if (Object.keys(testScores).length === 0) {
+    alert("Complete tests first");
+    return;
+  }
+
+  const finalGithub = githubSkipped ? "" : (github || detectedGithub);
+  const finalCF = cfSkipped ? "" : (codeforces || detectedCF);
+
+  const formData = new FormData();
+
+  formData.append("resume_file", resume);
+  formData.append("jd_file", jd);
+  formData.append("username", username);
+  formData.append("days_until_interview", days);
+  formData.append("hours_per_day", hours);
+
+  formData.append("github_username", finalGithub);
+  formData.append("cf_username", finalCF);
+
+  // IMPORTANT
+  formData.append("test_scores", JSON.stringify(testScores));
+
+  setLoading(true);
+
+  try {
+    const res = await fetch("http://127.0.0.1:8000/analyze-jd", {
+      method: "POST",
+      body: formData
+    });
+
+    const data = await res.json();
+
+    if (data.daily_tasks) {
+      setTasks(data.daily_tasks);
+      setStep("plan");
+
+      const nonEmptyDays = Object.entries(data.daily_tasks)
+  .filter(([_, tasks]) => tasks.length > 0)
+  .map(([day]) => Number(day));
+
+const actualDays = nonEmptyDays.length > 0 ? Math.max(...nonEmptyDays) : 0;
+
+setVisibleDays(actualDays);
+setTotalDays(Number(days) || actualDays);
+} else {
+      alert("Plan generation failed");
+    }
+
+  } catch (err) {
+    console.error(err);
+    alert("Error generating plan");
+  }
+
+  setLoading(false);
+};
+
+if (step === "plan" && !tasks) {
+  return <h2>Loading plan...</h2>;
+}
+
+if (step === "plan" && Object.keys(tasks).length === 0) {
+  return <h2>No plan found. Start again.</h2>;
+}
   return (
     <div className="dashboard">
 
       <h2 className="title">Preparation Planner</h2>
 
       {/* ================= STEP 1 ================= */}
-      {!profileStep && (
+      {step === "upload" &&  (
         <>
           <div className="dashboard-controls">
 
@@ -261,21 +389,24 @@ useEffect(() => {
 
           </div>
 
-          <button className="generate-btn" onClick={handleAnalyze}>
+          <button
+            className="generate-btn"
+            disabled={!resume || !jd}
+            onClick={handleAnalyze}>
             Verify Profiles
           </button>
         </>
       )}
 
       {/* ================= STEP 2 ================= */}
-      {profileStep && !tasks && (
+     {step === "verify" && (
         <div className="profile-section">
 
           <h3>Verify Profiles</h3>
 
-          <div className="dashboard-controls">
+          <div className="verify-card">
 
-            <div className="input-group">
+            <div className="verify-item">
               <label>GitHub</label>
 
               {detectedGithub ? (
@@ -305,7 +436,7 @@ useEffect(() => {
               )}
             </div>
 
-            <div className="input-group">
+            <div className="verify-item">
               <label>Codeforces</label>
 
               {detectedCF ? (
@@ -336,16 +467,124 @@ useEffect(() => {
             </div>
 
           </div>
+         <button className="generate-btn"
+  onClick={async () => {
+    setLoading(true);
+    const skills = await handleConfirm();
 
-          <button className="generate-btn" onClick={handleConfirm}>
-            Generate Plan
-          </button>
+    console.log("SKILLS FROM BACKEND:", skills);
 
+    if (!skills || skills.length === 0) {
+      return;
+    }
+
+    //  Generate questions immediately AFTER skills confirmed
+    try {
+      const res = await fetch("http://127.0.0.1:8000/generate-test", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          skills: skills
+        })
+      });
+
+      const data = await res.json();
+
+      console.log("QUESTIONS:", data);
+
+      if (!data.questions || Object.keys(data.questions).length === 0) {
+        alert("Question generation failed");
+        return;
+      }
+
+      setAllQuestions(data.questions);
+
+      // ONLY NOW move to skills page
+      setStep("skills");
+
+    } catch (err) {
+      console.error(err);
+      alert("Failed to generate questions");
+    }
+    setLoading(false);
+  }}
+>
+  Continue
+</button>
         </div>
       )}
 
+      {step === "skills" && (
+  jdSkills.length === 0 ? (
+    <h2>No skills found</h2>
+  ) :  (
+          <div>
+
+            {jdSkills.map((skill) => (
+              <div key={skill} className="skill-card">
+                <span className="skill-name">{skill}</span>
+
+                <div className="skill-action">
+                  {completedSkills.includes(skill) ? (
+                    <button className="generate-btn">Completed</button>
+                  ) : (
+                    <button
+                      className="generate-btn"
+                      onClick={() => {
+                        setCurrentSkill(skill);
+                        setAnswers({});
+                        setStep("test");
+                      }}
+                    >
+                      Take Test
+                    </button>
+                    )}
+                  </div>
+              </div>
+            ))}
+
+            {completedSkills.length === jdSkills.length && (
+              <button
+                className="generate-btn full-width-btn"
+                onClick={generatePlan}
+              >
+                Generate Plan
+              </button>
+            )}
+          </div>
+        ))}
+        {step === "test" && currentSkill &&  (
+          <div className="test-container">
+            <h2>{currentSkill} Test</h2>
+
+            {allQuestions[currentSkill]?.map((q, i) => (
+              <div key={i} className="question-card">
+                <div className="question-title">
+                  {i + 1}. {q.question}
+                </div>
+
+                {q.options.map((opt, idx) => (
+                  <div
+                      key={idx}
+                      className={`option ${answers[i] === opt ? "selected" : ""}`}
+                      onClick={() => setAnswers({ ...answers, [i]: opt })}
+                    >
+                    {opt}
+                  </div>
+                ))}
+              </div>
+            ))}
+
+            <button className="generate-btn" onClick={submitTest}>
+              Submit Test
+            </button>
+          </div>
+        )}
+
       {/* ================= FINAL TASKS ================= */}
-      {tasks && (
+      {step === "plan" && tasks &&  (
         <>
 
             <button
@@ -360,24 +599,51 @@ useEffect(() => {
                 body: JSON.stringify({ username })
               });
 
-              // 🔥 ALSO DELETE PLAN (important)
+              // ALSO DELETE PLAN (important)
               await fetch(`http://127.0.0.1:8000/delete-plan/${username}`, {
                 method: "DELETE"
               });
 
-              // 🔥 RESET UI STATE
+              // CORE DATA
               setTasks(null);
-              setProfileStep(false);
               setResume(null);
               setJd(null);
+
+              // INPUTS
+              setDays("");
+              setHours("");
+
+              // VERIFY STATE (YOU MISSED THIS)
+              setDetectedGithub(null);
+              setDetectedCF(null);
+              setGithub("");
+              setCodeforces("");
+              setGithubSkipped(false);
+              setCfSkipped(false);
+
+              // SKILLS + TEST STATE
+              setJdSkills([]);
+              setConfidenceMap({});
+              setCompletedSkills([]);
+              setAllQuestions({});
+              setAnswers({});
+              setCurrentSkill(null);
+              setTestScores({});
+
+              // PLAN STATE
               setRescheduledDays([]);
 
+              // STEP RESET
+              setStep("upload");
               alert("Data cleared. Start fresh.");
             }}>
             Delete Stored Resume
           </button>
 
-          {Object.entries(tasks).map(([day, dayTasks]) => (
+          {Object.entries(tasks)
+  .filter(([day]) => Number(day) <= visibleDays)
+  .sort((a, b) => Number(a[0]) - Number(b[0]))
+  .map(([day, dayTasks]) => (
             <div key={day} className="day-card">
 
               <h3>Day {day}</h3>
@@ -390,7 +656,6 @@ useEffect(() => {
                     disabled={task.skipped}
                     onChange={(e) => handleCheck(day, i, e.target.checked)}/>
 
-                  {/* ✅ MODIFIED PART */}
                   <div className="task-content">
                     <span
                       style={{
@@ -442,8 +707,7 @@ useEffect(() => {
             }}
             onClick={() => {
               localStorage.removeItem("username"); 
-              setTasks(null); 
-              setProfileStep(false); 
+              setTasks(null);  
               window.location.href = "/";
             }}
           >

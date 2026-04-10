@@ -1,7 +1,8 @@
 from utils.skill_categories import SKILL_CATEGORY_MAP
 from utils.category_roadmaps import CATEGORY_ROADMAPS
 from utils.task_blueprint import TASK_BLUEPRINTS, TASK_BLOCK_MAP
-
+from utils.llm_topics import get_cached_or_generate
+from utils.dependency_scheduler import compute_dependency_level
 STATUS_PRIORITY = {
     "Missing": 4,
     "Weak Evidence": 3,
@@ -25,11 +26,10 @@ def get_topics_by_confidence(category, confidence):
 
     elif confidence < 70:
         topics.extend(roadmap["intermediate"])
+        topics.extend(roadmap["advanced"])
     else:
         topics.extend(roadmap["advanced"])
 
-    if confidence < 70:
-        topics.extend(roadmap["advanced"])
 
     return topics
 
@@ -108,24 +108,37 @@ def generate_topic_pipeline(skill, topic_data, confidence):
     # -------------------------
     if not pipeline:
 
-        if topic in ["syntax", "control_flow", "functions"]:
+        clean_topic = topic.replace("_", " ")
+
+        if task_type == "learning":
             pipeline.append({
-                "task": f"Learn and practice {topic} in {skill}",
+                "task": f"Learn {clean_topic} concepts in {skill}",
                 "blocks": 1
             })
 
-        elif topic in ["oop", "file_handling"]:
+        elif task_type == "practice":
             pipeline.append({
-                "task": f"Practice {topic} with small programs in {skill}",
+                "task": f"Solve 3 problems on {clean_topic} ({skill})",
+                "blocks": 2
+            })
+
+        elif task_type == "build":
+            pipeline.append({
+                "task": f"Build a mini project using {clean_topic} in {skill}",
+                "blocks": 3
+            })
+
+        elif task_type == "optimize":
+            pipeline.append({
+                "task": f"Optimize performance of {clean_topic} in {skill}",
                 "blocks": 2
             })
 
         else:
             pipeline.append({
-                "task": f"Practice {topic} with real problems in {skill}",
-                "blocks": 2
+                "task": f"Practice {clean_topic} in {skill}",
+                "blocks": 1
             })
-
     return pipeline
 
 
@@ -137,27 +150,60 @@ def generate_preparation_plan(skill_gap_report, total_days, hours_per_day):
     total_slots = total_days * hours_per_day
     tasks = []
 
-    sorted_skills = sorted(
-        skill_gap_report.items(),
-        key=lambda x: (
-            STATUS_PRIORITY.get(x[1]["status"], 1),
-            -x[1]["confidence"]
-        ),
-        reverse=True
-    )
+    # preserve original order
+    skill_order = {skill: i for i, skill in enumerate(skill_gap_report.keys())}
+
+    def sort_key(item):
+        skill, data = item
+
+        level = compute_dependency_level(skill.lower())  #  dependency
+
+        return (
+            level,                                         # less dependent first
+            -STATUS_PRIORITY.get(data["status"], 1),        # higher status first
+            data["confidence"],                             # lower confidence first
+            skill_order[skill]                              #  stable order
+        )
+
+    sorted_skills = sorted(skill_gap_report.items(), key=sort_key)
 
     current_slots = 0
+    print(sorted_skills)
+
+    llm_topics_map = {}
+
+    missing_skills = [
+        skill for skill, _ in sorted_skills
+        if skill.lower() not in SKILL_CATEGORY_MAP
+    ]
+
+    for skill in missing_skills:
+        llm_topics_map[skill] = get_cached_or_generate(skill)
+
+    
 
     for skill, data in sorted_skills:
 
         confidence = data["confidence"]
-        category = SKILL_CATEGORY_MAP.get(skill.lower(), "default")
 
-        topics = get_topics_by_confidence(category, confidence)
+        if skill.lower() in SKILL_CATEGORY_MAP:
+            category = SKILL_CATEGORY_MAP[skill.lower()]
+            topics = get_topics_by_confidence(category, confidence)
+        else:
+            print(f"LLM fallback (cached) for skill: {skill}")
+            topics = llm_topics_map.get(skill, [])
+        print(topics)
 
         for topic_data in topics:
+            if not isinstance(topic_data, dict):
+                continue
+
+            if "topic" not in topic_data or "type" not in topic_data:
+                continue
 
             pipeline = generate_topic_pipeline(skill, topic_data, confidence)
+
+            if not pipeline:continue
 
             for task_data in pipeline:
 

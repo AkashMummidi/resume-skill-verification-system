@@ -11,7 +11,7 @@ function App() {
     <div className="app">
       {/* NAVBAR */}
       <div className="navbar">
-        <h3>ResolveNow</h3>
+        <h3>Skill-Based Learning System</h3>
         <div className="nav-links">
           <span onClick={() => setPage("login")}>Login</span>
           <span onClick={() => setPage("register")}>SignUp</span>

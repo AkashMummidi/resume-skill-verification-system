@@ -230,3 +230,108 @@ body {
   display: block;
   margin: 10px auto;
 }
+
+/* VERIFY PROFILE PAGE */
+.verify-card {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+
+  box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+}
+
+.verify-item {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 15px;
+}
+
+.verify-item label {
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.verify-item input {
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+
+.verify-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 15px;
+}
+
+/* TEST PAGE */
+.test-container {
+  max-width: 700px;
+  margin: auto;
+}
+
+.question-card {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+
+  box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+}
+
+.question-title {
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.option {
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  cursor: pointer;
+  background: #f9fafb;
+}
+
+.option:hover {
+  border-color: #4f46e5;
+}
+
+.option.selected {
+  background: #4f46e5;
+  color: white;
+  border: none;
+}
+.skill-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  background: white;
+  padding: 15px 20px;
+  border-radius: 10px;
+  margin-bottom: 12px;
+
+  box-shadow: 0 3px 10px rgba(0,0,0,0.05);
+}
+
+.full-width-btn {
+  width: 100%;
+  margin-top: 20px;
+  padding: 15px;
+  font-size: 16px;
+}
+.skill-name {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.skill-action {
+  min-width: 120px;
+  text-align: center;
+}

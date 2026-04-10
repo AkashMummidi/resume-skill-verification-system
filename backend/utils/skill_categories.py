@@ -58,5 +58,13 @@ SKILL_CATEGORY_MAP = {
     "git":"tools",
     "github":"tools",
     "linux":"tools",
-    "postman":"tools"
+    "postman":"tools",
+
+    # Cloud
+    "aws": "cloud",
+    "amazon web services": "cloud",
+    "ec2": "cloud",
+    "s3": "cloud",
+    "lambda": "cloud",
+    "cloud computing": "cloud"
 }

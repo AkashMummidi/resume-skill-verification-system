@@ -48,7 +48,7 @@ def generate_daily_schedule(tasks, days, hours_per_day, start_hour=9):
                 "completed": False
             })
 
-            # 🔥 handle multi-block tasks
+            #  handle multi-block tasks
             task["blocks"] -= 1
 
             if task["blocks"] == 0:
