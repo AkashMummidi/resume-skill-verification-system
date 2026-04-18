@@ -13,9 +13,7 @@ db = client[DB_NAME]
 users_collection = db["users"]
 plans_collection = db["plans"]
 test_scores_collection = db["test_scores"]
-llm_cache_collection = db["llm_topics_cache"]
 
-llm_cache_collection.create_index("skill", unique=True)
 
 # =========================
 # TEST SCORE STORAGE

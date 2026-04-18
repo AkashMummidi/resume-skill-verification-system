@@ -512,7 +512,7 @@ def generate_test(data: dict):
         if not skills or not isinstance(skills, list):
             raise HTTPException(status_code=400, detail="Skills list required")
 
-        result = generate_questions(skills, total_per_skill=10)
+        result = generate_questions(skills, total_per_skill=5)
 
         print("RAW RESULT:", result)
 

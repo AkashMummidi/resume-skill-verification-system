@@ -1,4 +1,4 @@
-from utils.db import llm_cache_collection
+from utils.redis_client import redis_client
 import requests
 import os
 import json
@@ -107,27 +107,25 @@ def generate_llm_topics(skill):
 
 def get_cached_or_generate(skill):
 
-    skill_key = skill.lower().strip().replace(" ", "")
+    skill_key = f"llm:{skill.lower().strip()}"
 
-    # 1. Check cache
-    cached = llm_cache_collection.find_one({"skill": skill_key})
+    # 1. Redis check
+    cached = redis_client.get(skill_key)
 
     if cached:
         print(f"CACHE HIT: {skill}")
-        return cached["topics"]
+        return json.loads(cached)
 
     print(f"CACHE MISS → LLM CALL: {skill}")
 
-    # 2. Call LLM
+    # 2. Generate
     topics = generate_llm_topics(skill)
 
-    # 3. Store in DB
-    try:
-        llm_cache_collection.insert_one({
-            "skill": skill_key,
-            "topics": topics
-        })
-    except Exception as e:
-        print("CACHE STORE FAILED:", e)
+    # 3. Store in Redis (24h)
+    redis_client.setex(
+        skill_key,
+        86400,
+        json.dumps(topics)
+    )
 
     return topics

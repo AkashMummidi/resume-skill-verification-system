@@ -3,7 +3,9 @@ import os
 import json
 import re
 
-API_KEY = os.getenv("GEMINI_API_KEY")
+API_KEYS =[os.getenv("GEMINI_API_KEY_1"),
+            os.getenv("GEMINI_API_KEY_2"),
+            os.getenv("GEMINI_API_KEY_3")]
 
 
 # -------------------------------
@@ -34,7 +36,7 @@ def compute_counts(dist, total=10):
 # -------------------------------
 # GENERATE QUESTIONS (FIXED)
 # -------------------------------
-def generate_questions(skills, total_per_skill=10):
+def generate_questions(skills, total_per_skill=5):
 
     print(skills)
 
@@ -72,46 +74,48 @@ def generate_questions(skills, total_per_skill=10):
         ]
     }
 
-    for model in models:
-        try:
-            print("TRYING MODEL:", model)
+    for API_KEY in API_KEYS:
 
-            url = f"https://generativelanguage.googleapis.com/v1beta/{model}:generateContent?key={API_KEY}"
+        for model in models:
+            try:
+                print("TRYING MODEL:", model)
 
-            res = requests.post(url, json=body)
-            data = res.json()
+                url = f"https://generativelanguage.googleapis.com/v1beta/{model}:generateContent?key={API_KEY}"
 
-            print("RESPONSE:", data)
+                res = requests.post(url, json=body)
+                data = res.json()
 
-            if "error" in data:
-                print("MODEL FAILED:", data["error"]["message"])
-                continue   
+                print("RESPONSE:", data)
 
-            if "candidates" not in data:
-                print("NO CANDIDATES")
+                if "error" in data:
+                    print("MODEL FAILED:", data["error"]["message"])
+                    continue   
+
+                if "candidates" not in data:
+                    print("NO CANDIDATES")
+                    continue
+
+                text = data["candidates"][0]["content"]["parts"][0]["text"]
+
+                text = re.sub(r"```json|```", "", text).strip()
+
+                start = text.find("{")
+                end = text.rfind("}") + 1
+
+                if start == -1 or end == -1:
+                    print("INVALID JSON FORMAT")
+                    continue
+
+                result = json.loads(text[start:end])
+
+                print("SUCCESS WITH:", model)
+                return result  
+
+            except Exception as e:
+                print("MODEL EXCEPTION:", e)
                 continue
 
-            text = data["candidates"][0]["content"]["parts"][0]["text"]
-
-            text = re.sub(r"```json|```", "", text).strip()
-
-            start = text.find("{")
-            end = text.rfind("}") + 1
-
-            if start == -1 or end == -1:
-                print("INVALID JSON FORMAT")
-                continue
-
-            result = json.loads(text[start:end])
-
-            print("SUCCESS WITH:", model)
-            return result  
-
-        except Exception as e:
-            print("MODEL EXCEPTION:", e)
-            continue
-
-    # ONLY AFTER ALL MODELS FAIL
+        # ONLY AFTER ALL MODELS FAIL
     print("ALL MODELS FAILED → FALLBACK")
     return {}
 # -------------------------------
