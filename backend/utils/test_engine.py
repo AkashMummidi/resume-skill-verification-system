@@ -41,9 +41,9 @@ def generate_questions(skills, total_per_skill=5):
     print(skills)
 
     models = [
-        "models/gemini-2.0-flash",
-        "models/gemini-2.0-flash-001",
-        "models/gemini-flash-lite-latest"
+        "models/gemini-flash-lite-latest",
+        "models/gemini-3.1-flash-lite",
+        "models/gemini-3.1-flash"
     ]
 
     skills_str = ", ".join(skills)
